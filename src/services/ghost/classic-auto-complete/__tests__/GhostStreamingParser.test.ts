@@ -688,7 +688,7 @@ return result;`
 			expect(fimContent?.text).toBe(expectedMiddle)
 		})
 
-		it("should parse suggestion with cursor marker at end of replace content and newlines", () => {
+		it("should parse suggestion with cursor marker in single line", () => {
 			const mockDocumentWithCursor: any = {
 				uri: { toString: () => "/test/file.ts", fsPath: "/test/file.ts" },
 				getText: () => `
@@ -699,32 +699,59 @@ return result;`
 
 			parser.initialize({ document: mockDocumentWithCursor })
 
-			const replaceContent = `
+			const change = `<change><search><![CDATA[
+<<<AUTOCOMPLETE_HERE>>>
+]]></search><replace><![CDATA[
 // implement function to subtract two numbers
 function subtractNumbers(a: number, b: number): number {
 		  return a - b;
-}
-`
-
-			const change = `<change><search><![CDATA[
-<<<AUTOCOMPLETE_HERE>>>
-]]></search><replace><![CDATA[${replaceContent}<<<AUTOCOMPLETE_HERE>>>
+}<<<AUTOCOMPLETE_HERE>>>
 ]]></replace></change>`
 
-			// Expected includes the trailing newline from the replace block
 			const expectedContent = `
 // implement function to subtract two numbers
 function subtractNumbers(a: number, b: number): number {
 		  return a - b;
 }
-
 `
 
 			const result = parser.parseResponse(change, "", "")
 
 			expect(result.hasNewSuggestions).toBe(true)
 
-			// Verify cursor marker is removed from end of replace content
+			const fimContent = result.suggestions.getFillInAtCursor()
+			expect(fimContent).toBeDefined()
+			expect(fimContent?.text).toBe(expectedContent)
+		})
+
+		it("should parse suggestion with cursor marker at end of replace content and newlines", () => {
+			const mockDocumentWithCursor: any = {
+				uri: { toString: () => "/test/file.ts", fsPath: "/test/file.ts" },
+				getText: () => `<<<AUTOCOMPLETE_HERE>>>`,
+				languageId: "typescript",
+			}
+
+			parser.initialize({ document: mockDocumentWithCursor })
+
+			const change = `<change><search><![CDATA[<<<AUTOCOMPLETE_HERE>>>
+]]></search><replace><![CDATA[
+// implement function to subtract two numbers
+function subtractNumbers(a: number, b: number): number {
+		  return a - b;
+}<<<AUTOCOMPLETE_HERE>>>
+]]></replace></change>`
+
+			const expectedContent = `
+// implement function to subtract two numbers
+function subtractNumbers(a: number, b: number): number {
+		  return a - b;
+}
+`
+
+			const result = parser.parseResponse(change, "", "")
+
+			expect(result.hasNewSuggestions).toBe(true)
+
 			const fimContent = result.suggestions.getFillInAtCursor()
 			expect(fimContent).toBeDefined()
 			expect(fimContent?.text).toBe(expectedContent)
