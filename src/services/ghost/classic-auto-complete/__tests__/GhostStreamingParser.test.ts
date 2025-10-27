@@ -756,6 +756,43 @@ function subtractNumbers(a: number, b: number): number {
 			expect(fimContent).toBeDefined()
 			expect(fimContent?.text).toBe(expectedContent)
 		})
+
+		it("should parse empty document with cursor marker and function suggestion", () => {
+			// Simulating empty document on line 4 (3 empty lines before cursor)
+			const mockDocumentWithCursor: any = {
+				uri: { toString: () => "/test/file.ts", fsPath: "/test/file.ts" },
+				getText: () => `
+
+<<<AUTOCOMPLETE_HERE>>>`,
+				languageId: "typescript",
+			}
+
+			parser.initialize({ document: mockDocumentWithCursor })
+
+			// This is the exact XML response from the user's console logs
+			const change = `<change><search><![CDATA[
+
+<<<AUTOCOMPLETE_HERE>>>]]></search><replace><![CDATA[
+
+export function test() {
+<<<AUTOCOMPLETE_HERE>>>]]></replace></change>`
+
+			const result = parser.parseResponse(change, "", "")
+
+			// Parser correctly produces suggestions from this XML
+			expect(result.hasNewSuggestions).toBe(true)
+			expect(result.suggestions.hasSuggestions()).toBe(true)
+
+			// Expected content after removing cursor marker
+			const expectedContent = `
+
+export function test() {
+`
+
+			const fimContent = result.suggestions.getFillInAtCursor()
+			expect(fimContent).toBeDefined()
+			expect(fimContent?.text).toBe(expectedContent)
+		})
 	})
 
 	describe("Fill-In-Middle (FIM) behavior", () => {
