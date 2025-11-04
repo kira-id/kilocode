@@ -50,3 +50,23 @@ Object.defineProperty(window, "matchMedia", {
 
 // Mock scrollIntoView which is not available in jsdom
 Element.prototype.scrollIntoView = vi.fn()
+
+// kilocode_change start
+// Mock i18n setup to prevent eager loading of locale files during tests
+// This prevents Vite from trying to parse all JSON files at import time
+vi.mock("./src/i18n/setup", () => {
+	const mockI18next = {
+		language: "en",
+		use: vi.fn().mockReturnThis(),
+		init: vi.fn().mockReturnThis(),
+		t: vi.fn((key: string) => key),
+		changeLanguage: vi.fn(),
+		addResourceBundle: vi.fn(),
+	}
+
+	return {
+		default: mockI18next,
+		loadTranslations: vi.fn(),
+	}
+})
+// kilocode_change end

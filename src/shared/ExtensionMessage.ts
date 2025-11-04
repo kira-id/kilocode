@@ -373,6 +373,7 @@ export type ExtensionState = Pick<
 	| "commitMessageApiConfigId" // kilocode_change
 	| "terminalCommandApiConfigId" // kilocode_change
 	| "dismissedNotificationIds" // kilocode_change
+	| "lastViewedReleaseVersion" // kilocode_change
 	| "ghostServiceSettings" // kilocode_change
 	| "autoPurgeEnabled" // kilocode_change
 	| "autoPurgeDefaultRetentionDays" // kilocode_change

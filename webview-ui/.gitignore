@@ -11,6 +11,9 @@
 # production
 /build
 
+# kilocode_change - Generated release notes JSON (but keep .d.ts files)
+/src/generated/**/*.json
+
 # misc
 .DS_Store
 .env.local

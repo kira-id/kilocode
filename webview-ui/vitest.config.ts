@@ -24,6 +24,9 @@ export default defineConfig({
 			// Mock the vscode module for tests since it's not available outside
 			// VS Code extension context.
 			vscode: path.resolve(__dirname, "./src/__mocks__/vscode.ts"),
+			"../generated/releases/releases.json": path.resolve(__dirname, "./src/__mocks__/releases.json"),
 		},
 	},
+	// Only include specific JSON files we actually need as assets
+	assetsInclude: ["src/i18n/locales/**/*.json", "src/generated/**/*.json"],
 })

@@ -92,7 +92,11 @@ export function sourcemapPlugin(): Plugin {
 							fs.writeFileSync(mapPath, JSON.stringify(mapContent, null, 2))
 							console.log(`Updated source map for ${jsFile}`)
 						} catch (error) {
-							console.error(`Error processing source map for ${jsFile}:`, error)
+							console.error(
+								`Skipping malformed source map for ${jsFile}:`,
+								error instanceof Error ? error.message : error,
+							)
+							fs.unlinkSync(mapPath) // Delete the malformed source map to prevent build errors
 						}
 					} else {
 						console.log(`No source map found for ${jsFile}`)

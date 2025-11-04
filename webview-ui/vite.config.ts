@@ -51,6 +51,21 @@ const persistPortPlugin = (): Plugin => ({
 	},
 })
 
+// kilocode_change start: Generate release notes at build time
+const releaseNotesPlugin = (): Plugin => ({
+	name: "generate-release-notes",
+	buildStart() {
+		console.log("[Release Notes Plugin] Generating release notes...")
+		try {
+			execSync("node scripts/generate-release-notes.mjs", { cwd: __dirname, stdio: "inherit" })
+			console.log("[Release Notes Plugin] Release notes generated successfully")
+		} catch (error) {
+			console.error("[Release Notes Plugin] Failed to generate release notes:", error)
+		}
+	},
+})
+// kilocode_change end
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
 	let outDir = "../src/webview-ui/build"
@@ -91,7 +106,14 @@ export default defineConfig(({ mode }) => {
 		define["process.env.PKG_OUTPUT_CHANNEL"] = JSON.stringify("Kilo-Code-Nightly")
 	}
 
-	const plugins: PluginOption[] = [react(), tailwindcss(), persistPortPlugin(), wasmPlugin(), sourcemapPlugin()]
+	const plugins: PluginOption[] = [
+		react(),
+		tailwindcss(),
+		persistPortPlugin(),
+		wasmPlugin(),
+		sourcemapPlugin(),
+		releaseNotesPlugin(), // kilocode_change: Generate release notes at build time
+	]
 
 	return {
 		plugins,
