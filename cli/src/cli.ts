@@ -24,6 +24,7 @@ import type { CLIOptions } from "./types/cli.js"
 import type { CLIConfig, ProviderConfig } from "./config/types.js"
 import { getModelIdKey } from "./constants/providers/models.js"
 import type { ProviderName } from "./types/messages.js"
+import { WebUIServer } from "./ui/web/WebUIServer.js"
 
 /**
  * Main application class that orchestrates the CLI lifecycle
@@ -32,6 +33,8 @@ export class CLI {
 	private service: ExtensionService | null = null
 	private store: ReturnType<typeof createStore> | null = null
 	private ui: Instance | null = null
+	private webServer: WebUIServer | null = null
+	private exitResolver: (() => void) | null = null
 	private options: CLIOptions
 	private isInitialized = false
 
@@ -173,6 +176,35 @@ export class CLI {
 			throw new Error("Store not initialized")
 		}
 
+		const useWebUI = !this.options.ci && !this.options.json
+
+		if (useWebUI && this.service) {
+			const port = Number(process.env.KILO_WEB_UI_PORT || "4000")
+			process.env.NEXT_PUBLIC_WEB_UI_PORT = port.toString()
+
+			this.webServer = new WebUIServer({
+				service: this.service,
+				port,
+				options: this.options,
+				onExit: () => this.dispose(),
+			})
+
+			await this.webServer.start()
+
+			if (this.options.prompt) {
+				await this.service.sendWebviewMessage({
+					type: "askResponse",
+					text: this.options.prompt,
+					askResponse: "messageResponse",
+				})
+			}
+
+			await new Promise<void>((resolve) => {
+				this.exitResolver = resolve
+			})
+			return
+		}
+
 		// Render UI with store
 		// Disable stdin for Ink when in CI mode or when stdin is piped (not a TTY)
 		// This prevents the "Raw mode is not supported" error
@@ -305,6 +337,11 @@ export class CLI {
 				this.ui = null
 			}
 
+			if (this.webServer) {
+				await this.webServer.stop()
+				this.webServer = null
+			}
+
 			// Dispose service
 			if (this.service) {
 				await this.service.dispose()
@@ -314,6 +351,8 @@ export class CLI {
 			// Clear store reference
 			this.store = null
 
+			this.exitResolver?.()
+			this.exitResolver = null
 			this.isInitialized = false
 			logs.info("Kilo Code CLI disposed", "CLI")
 		} catch (error) {

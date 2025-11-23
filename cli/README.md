@@ -2,6 +2,8 @@
 
 Terminal User Interface for Kilo Code
 
+> The interactive UI now runs as a Next.js web experience. When you start the CLI outside CI/JSON modes, visit http://localhost:4000 to chat with the agent.
+
 ## Installation
 
 ```bash
