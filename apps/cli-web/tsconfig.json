@@ -1,0 +1,10 @@
+{
+	"extends": "@roo-code/config-typescript/nextjs.json",
+	"compilerOptions": {
+		"paths": {
+			"@/*": ["./app/*"]
+		}
+	},
+	"include": ["next-env.d.ts", "app/**/*.ts", "app/**/*.tsx", ".next/types/**/*.ts"],
+	"exclude": ["node_modules"]
+}

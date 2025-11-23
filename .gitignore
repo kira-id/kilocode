@@ -13,6 +13,7 @@ mock/
 bin/
 bin-unpacked/
 *.vsix
+.next/
 
 # Local prompts and rules
 /local-prompts
