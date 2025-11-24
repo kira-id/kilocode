@@ -1,4 +1,4 @@
-import { access } from "node:fs/promises"
+import { access, stat } from "node:fs/promises"
 import { constants } from "node:fs"
 import { spawn } from "node:child_process"
 import path from "node:path"
@@ -15,32 +15,56 @@ async function fileExists(target: string): Promise<boolean> {
 	}
 }
 
+let cliBuildPromise: Promise<void> | null = null
+
+async function needsCliRebuild(repoRoot: string): Promise<boolean> {
+	const cliEntry = path.join(repoRoot, "cli", "dist", "index.js")
+	const cliSrcDir = path.join(repoRoot, "cli", "src")
+
+	const distExists = await fileExists(cliEntry)
+	if (!distExists) {
+		return true
+	}
+
+	try {
+		const [distStat, srcStat] = await Promise.all([stat(cliEntry), stat(cliSrcDir)])
+		return distStat.mtimeMs < srcStat.mtimeMs
+	} catch {
+		return true
+	}
+}
+
 async function ensureCliBuild(repoRoot: string): Promise<void> {
-	const cliDist = path.join(repoRoot, "cli", "dist", "index.js")
-	if (await fileExists(cliDist)) {
+	if (!(await needsCliRebuild(repoRoot))) {
 		return
 	}
 
-	await new Promise<void>((resolve, reject) => {
-		const builder = spawn("pnpm", ["--filter", "@kilocode/cli", "build"], {
-			cwd: repoRoot,
-			stdio: "inherit",
-			env: {
-				...process.env,
-				// Avoid color codes in downstream parsing
-				FORCE_COLOR: "0",
-			},
-		})
+	if (!cliBuildPromise) {
+		cliBuildPromise = new Promise<void>((resolve, reject) => {
+			const builder = spawn("pnpm", ["--filter", "@kilocode/cli", "build"], {
+				cwd: repoRoot,
+				stdio: "inherit",
+				env: {
+					...process.env,
+					// Avoid color codes in downstream parsing
+					FORCE_COLOR: "0",
+				},
+			})
 
-		builder.on("error", reject)
-		builder.on("exit", (code) => {
-			if (code === 0) {
-				resolve()
-			} else {
-				reject(new Error(`CLI build failed with exit code ${code}`))
-			}
+			builder.on("error", reject)
+			builder.on("exit", (code) => {
+				if (code === 0) {
+					resolve()
+				} else {
+					reject(new Error(`CLI build failed with exit code ${code}`))
+				}
+			})
+		}).finally(() => {
+			cliBuildPromise = null
 		})
-	})
+	}
+
+	return cliBuildPromise
 }
 
 export async function POST(request: NextRequest) {
@@ -71,23 +95,43 @@ export async function POST(request: NextRequest) {
 
 	const encoder = new TextEncoder()
 
+	let safeClose = () => {}
+	let safeEnqueue = (_chunk: string) => {}
+
 	const stream = new ReadableStream<Uint8Array>({
 		start(controller) {
+			let isClosed = false
+			safeEnqueue = (chunk: string) => {
+				if (isClosed) return
+				controller.enqueue(encoder.encode(chunk))
+			}
+			safeClose = () => {
+				if (isClosed) return
+				controller.close()
+				isClosed = true
+			}
+
 			child.stdout.on("data", (data) => {
-				controller.enqueue(encoder.encode(data.toString()))
+				safeEnqueue(data.toString())
 			})
 
 			child.stderr.on("data", (data) => {
-				controller.enqueue(encoder.encode(`STDERR: ${data.toString()}`))
+				safeEnqueue(`STDERR: ${data.toString()}`)
 			})
 
 			child.on("close", (code) => {
-				controller.enqueue(encoder.encode(`\nProcess exited with code ${code ?? "unknown"}`))
-				controller.close()
+				safeEnqueue(`\nProcess exited with code ${code ?? "unknown"}`)
+				safeClose()
+			})
+
+			child.on("error", (error) => {
+				safeEnqueue(`STDERR: ${error instanceof Error ? error.message : String(error)}`)
+				safeClose()
 			})
 		},
 		cancel() {
 			child.kill("SIGINT")
+			safeClose()
 		},
 	})
 

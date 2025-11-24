@@ -4,6 +4,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
+		"predev": "pnpm --filter @kilocode/cli build",
 		"dev": "next dev",
 		"build": "next build",
 		"start": "next start",
