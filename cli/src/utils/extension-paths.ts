@@ -1,3 +1,4 @@
+import * as fs from "fs"
 import * as path from "path"
 import { fileURLToPath } from "url"
 
@@ -7,19 +8,15 @@ export interface ExtensionPaths {
 }
 
 /**
- * Resolves extension paths for production CLI.
- * Assumes the extension is bundled in dist/kilocode/
+ * Resolves extension paths for the CLI.
+ * Prefers the packaged dist/kilocode/ bundle but gracefully falls back to
+ * the local VS Code extension source so developers can run the CLI without
+ * manually copying files first.
  *
- * Production structure:
- * cli/dist/
- * ├── index.js
- * ├── cli/KiloCodeCLI.js
- * ├── host/ExtensionHost.js
- * ├── utils/extension-paths.js (this file)
- * └── kilocode/
- *     ├── dist/extension.js
- *     ├── assets/
- *     └── webview-ui/
+ * Search order:
+ * 1. cli/dist/kilocode/ (packaged bundle used in releases)
+ * 2. bin-unpacked/extension (output of vsix:unpacked)
+ * 3. src/ (local extension workspace with dist/extension.js)
  */
 export function resolveExtensionPaths(): ExtensionPaths {
 	// Get the directory where this compiled file is located
@@ -34,8 +31,26 @@ export function resolveExtensionPaths(): ExtensionPaths {
 	// Navigate to dist directory
 	const distDir = isInUtilsSubdir ? path.resolve(currentDir, "..") : currentDir
 
-	// Extension is in dist/kilocode/
-	const extensionRootPath = path.join(distDir, "kilocode")
+	const candidateRoots = [
+		path.join(distDir, "kilocode"),
+		path.resolve(distDir, "..", "bin-unpacked", "extension"),
+		path.resolve(distDir, "..", "src"),
+		// When running the CLI from the repository root, the extension lives at ../../src
+		path.resolve(distDir, "..", "..", "src"),
+	]
+
+	const extensionRootPath = candidateRoots.find((candidate) =>
+		fs.existsSync(path.join(candidate, "dist", "extension.js")),
+	)
+
+	if (!extensionRootPath) {
+		throw new Error(
+			`Unable to locate extension bundle. Checked: ${candidateRoots
+				.map((candidate) => path.join(candidate, "dist", "extension.js"))
+				.join(", ")}`,
+		)
+	}
+
 	const extensionBundlePath = path.join(extensionRootPath, "dist", "extension.js")
 
 	return {
