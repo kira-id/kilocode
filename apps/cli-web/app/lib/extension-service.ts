@@ -53,29 +53,44 @@ async function getCliEntry(): Promise<string> {
 	return path.join(repoRoot, "cli", "dist", "index.js")
 }
 
-async function needsCliRebuild(cliEntry: string, repoRoot: string): Promise<boolean> {
-	const distExists = await pathExists(cliEntry)
-	if (!distExists) return true
+async function getExtensionBundle(): Promise<string> {
+	const repoRoot = await repoRootPromise
+	return path.join(repoRoot, "cli", "dist", "kilocode", "dist", "extension.js")
+}
+
+async function needsCliBundle(cliEntry: string, repoRoot: string): Promise<boolean> {
+	const extensionBundle = await getExtensionBundle()
+	const [cliExists, extensionExists] = await Promise.all([pathExists(cliEntry), pathExists(extensionBundle)])
+
+	if (!cliExists || !extensionExists) return true
 
 	const cliSrcDir = path.join(repoRoot, "cli", "src")
+	const extensionSrcDir = path.join(repoRoot, "src")
+
 	try {
-		const [distStat, srcStat] = await Promise.all([stat(cliEntry), stat(cliSrcDir)])
-		return distStat.mtimeMs < srcStat.mtimeMs
+		const [cliStat, cliSrcStat, extensionStat, extensionSrcStat] = await Promise.all([
+			stat(cliEntry),
+			stat(cliSrcDir),
+			stat(extensionBundle),
+			stat(extensionSrcDir),
+		])
+
+		return cliStat.mtimeMs < cliSrcStat.mtimeMs || extensionStat.mtimeMs < extensionSrcStat.mtimeMs
 	} catch {
 		return true
 	}
 }
 
-let cliBuildPromise: Promise<void> | null = null
+let cliBundlePromise: Promise<void> | null = null
 
-async function ensureCliBuild(cliEntry: string, repoRoot: string): Promise<void> {
-	if (!(await needsCliRebuild(cliEntry, repoRoot))) {
+async function ensureCliBundle(cliEntry: string, repoRoot: string): Promise<void> {
+	if (!(await needsCliBundle(cliEntry, repoRoot))) {
 		return
 	}
 
-	if (!cliBuildPromise) {
-		cliBuildPromise = new Promise<void>((resolve, reject) => {
-			const builder = spawn("pnpm", ["--filter", "@kilocode/cli", "build"], {
+	if (!cliBundlePromise) {
+		cliBundlePromise = new Promise<void>((resolve, reject) => {
+			const builder = spawn("pnpm", ["cli:bundle"], {
 				cwd: repoRoot,
 				stdio: "inherit",
 				env: {
@@ -89,15 +104,15 @@ async function ensureCliBuild(cliEntry: string, repoRoot: string): Promise<void>
 				if (code === 0) {
 					resolve()
 				} else {
-					reject(new Error(`CLI build failed with exit code ${code}`))
+					reject(new Error(`CLI bundle failed with exit code ${code}`))
 				}
 			})
 		}).finally(() => {
-			cliBuildPromise = null
+			cliBundlePromise = null
 		})
 	}
 
-	return cliBuildPromise
+	return cliBundlePromise
 }
 
 async function resolveWorkspacePath(
@@ -166,7 +181,7 @@ export async function createCliRunStream(options: CliRunOptions): Promise<Readab
 
 	const { workspace, repoRoot, cliEntry } = await resolveWorkspacePath(options.workspace)
 
-	await ensureCliBuild(cliEntry, repoRoot)
+	await ensureCliBundle(cliEntry, repoRoot)
 
 	const args = [cliEntry, "--auto", "--json", prompt, "--workspace", workspace]
 
