@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
 import { access, stat } from "node:fs/promises"
 import { constants } from "node:fs"
 import path from "node:path"
+import { DEFAULT_MODE, MODE_OPTIONS } from "./modes"
 
 export class CliRunRequestError extends Error {
 	status: number
@@ -171,6 +172,7 @@ function createStreamFromProcess(child: ChildProcessWithoutNullStreams): Readabl
 export interface CliRunOptions {
 	prompt: string
 	workspace?: string
+	mode?: string
 }
 
 export async function createCliRunStream(options: CliRunOptions): Promise<ReadableStream<Uint8Array>> {
@@ -179,11 +181,18 @@ export async function createCliRunStream(options: CliRunOptions): Promise<Readab
 		throw new CliRunRequestError("Prompt is required")
 	}
 
+	const mode = (options.mode ?? DEFAULT_MODE).trim()
+	if (!MODE_OPTIONS.some((entry) => entry.slug === mode)) {
+		throw new CliRunRequestError(
+			`Invalid mode "${mode}". Valid modes: ${MODE_OPTIONS.map((entry) => entry.slug).join(", ")}`,
+		)
+	}
+
 	const { workspace, repoRoot, cliEntry } = await resolveWorkspacePath(options.workspace)
 
 	await ensureCliBundle(cliEntry, repoRoot)
 
-	const args = [cliEntry, "--auto", "--json", prompt, "--workspace", workspace]
+	const args = [cliEntry, "--auto", "--json", "--mode", mode, prompt, "--workspace", workspace]
 
 	const child = spawn("node", args, {
 		cwd: workspace,

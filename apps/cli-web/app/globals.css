@@ -135,7 +135,8 @@ h2 {
 }
 
 input,
-textarea {
+textarea,
+select {
 	width: 100%;
 	padding: 12px 14px;
 	border-radius: 12px;
@@ -150,7 +151,8 @@ textarea {
 }
 
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
 	outline: none;
 	border-color: #8be9fd;
 	box-shadow: 0 0 0 2px rgba(139, 233, 253, 0.2);

@@ -1,10 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react"
+import { DEFAULT_MODE, MODE_OPTIONS } from "@/lib/modes"
 
 interface RunPayload {
 	prompt: string
 	workspace?: string
+	mode?: string
 }
 
 type RunStatus = "idle" | "running" | "error" | "complete"
@@ -19,6 +21,7 @@ const statusLabel: Record<RunStatus, string> = {
 export default function HomePage() {
 	const [prompt, setPrompt] = useState("")
 	const [workspace, setWorkspace] = useState("")
+	const [mode, setMode] = useState<string>(DEFAULT_MODE)
 	const [status, setStatus] = useState<RunStatus>("idle")
 	const [output, setOutput] = useState("")
 	const [error, setError] = useState<string | null>(null)
@@ -27,6 +30,7 @@ export default function HomePage() {
 
 	const isRunning = status === "running"
 	const isDisabled = useMemo(() => isRunning || prompt.trim().length === 0, [prompt, isRunning])
+	const currentMode = useMemo(() => MODE_OPTIONS.find((entry) => entry.slug === mode), [mode])
 
 	useEffect(() => {
 		if (logRef.current) {
@@ -47,7 +51,7 @@ export default function HomePage() {
 		setOutput("")
 		setError(null)
 
-		const payload: RunPayload = { prompt: prompt.trim() }
+		const payload: RunPayload = { prompt: prompt.trim(), mode }
 		if (workspace.trim().length > 0) {
 			payload.workspace = workspace.trim()
 		}
@@ -95,7 +99,7 @@ export default function HomePage() {
 		} finally {
 			controllerRef.current = null
 		}
-	}, [prompt, workspace])
+	}, [mode, prompt, workspace])
 
 	const onSubmit = useCallback(
 		async (event: FormEvent<HTMLFormElement>) => {
@@ -110,11 +114,11 @@ export default function HomePage() {
 	}, [])
 
 	const cliPreview = useMemo(() => {
-		const base = "node cli/dist/index.js --auto --json"
+		const base = `node cli/dist/index.js --auto --json --mode ${mode}`
 		const promptArg = prompt.trim().length > 0 ? ` "${prompt.trim()}"` : ""
 		const workspaceArg = workspace.trim().length > 0 ? ` --workspace ${workspace.trim()}` : ""
 		return `${base}${promptArg}${workspaceArg}`
-	}, [prompt, workspace])
+	}, [mode, prompt, workspace])
 
 	return (
 		<main className="page">
@@ -126,6 +130,10 @@ export default function HomePage() {
 						Provide a prompt, optionally target a workspace, and stream the CLI output without leaving your
 						browser. The interface wraps the existing <code>@kilocode/cli</code> in autonomous JSON mode so
 						you can debug runs visually.
+					</p>
+					<p className="muted">
+						Using <strong>{currentMode?.name ?? mode}</strong> mode by default. Switch modes below to run as
+						an architect, coder, debugger, orchestrator, or Q&A specialist.
 					</p>
 				</div>
 				<div className="status-pill" data-status={status}>
@@ -161,6 +169,27 @@ export default function HomePage() {
 								value={workspace}
 								onChange={(event) => setWorkspace(event.target.value)}
 							/>
+						</label>
+
+						<label className="field">
+							<div className="field__label">
+								<span>Mode</span>
+								<span className="hint">Pick the agent specialization to run</span>
+							</div>
+							<select
+								id="mode"
+								name="mode"
+								value={mode}
+								onChange={(event) => setMode(event.target.value)}>
+								{MODE_OPTIONS.map((option) => (
+									<option key={option.slug} value={option.slug}>
+										{option.name} · {option.description}
+									</option>
+								))}
+							</select>
+							<p className="hint">
+								Current mode: {MODE_OPTIONS.find((entry) => entry.slug === mode)?.name}
+							</p>
 						</label>
 
 						<label className="field">

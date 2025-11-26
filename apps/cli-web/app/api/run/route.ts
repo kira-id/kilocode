@@ -4,13 +4,17 @@ import { CliRunRequestError, createCliRunStream } from "@/lib/extension-service"
 export const runtime = "nodejs"
 
 export async function POST(request: NextRequest) {
-	const body = (await request.json().catch(() => null)) as { prompt?: string; workspace?: string } | null
+	const body = (await request.json().catch(() => null)) as {
+		prompt?: string
+		workspace?: string
+		mode?: string
+	} | null
 	if (!body?.prompt || body.prompt.trim().length === 0) {
 		return NextResponse.json({ error: "Prompt is required" }, { status: 400 })
 	}
 
 	try {
-		const stream = await createCliRunStream({ prompt: body.prompt, workspace: body.workspace })
+		const stream = await createCliRunStream({ prompt: body.prompt, workspace: body.workspace, mode: body.mode })
 
 		return new NextResponse(stream, {
 			headers: {
