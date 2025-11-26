@@ -10,6 +10,7 @@
 	},
 	"scripts": {
 		"build": "node esbuild.config.mjs",
+		"bundle": "pnpm clean:kilocode && pnpm build && pnpm copy:kilocode",
 		"dev": "pnpm build --watch",
 		"deps:install": "npm install --omit=dev --prefix ./dist",
 		"deps:freeze": "npm shrinkwrap --prefix ./dist",
