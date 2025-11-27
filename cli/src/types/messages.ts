@@ -79,6 +79,7 @@ export interface ExtensionState {
 	currentTaskTodos?: TodoItem[]
 	mode: string
 	customModes: ModeConfig[]
+	availableModes?: ModeConfig[]
 	taskHistoryFullLength: number
 	taskHistoryVersion: number
 	mcpServers?: McpServer[]

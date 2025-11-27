@@ -18,9 +18,11 @@ import { envConfigExists, getMissingEnvVars } from "./config/env-config.js"
 import { getParallelModeParams } from "./parallel/parallel.js"
 import { DEBUG_MODES, DEBUG_FUNCTIONS } from "./debug/index.js"
 import { logs } from "./services/logs.js"
+import type { WebServerController, StartWebServerOptions } from "./web/server/index.js"
 
 const program = new Command()
 let cli: CLI | null = null
+let webController: WebServerController | null = null
 
 // Get list of valid mode slugs from default modes
 // Custom modes will be loaded and validated per workspace
@@ -217,6 +219,45 @@ program
 	})
 
 program
+	.command("web")
+	.description("Launch the Kilo Code web chat server")
+	.option("-p, --port <port>", "Port to bind", (value: string) => parseInt(value, 10), 4173)
+	.option("--host <host>", "Host interface", "127.0.0.1")
+	.option("-w, --workspace <path>", "Workspace directory", process.cwd())
+	.option("--static-dir <path>", "Path to prebuilt web assets")
+	.action(async (options: { port: number; host: string; workspace: string; staticDir?: string }) => {
+		const resolvedWorkspace = options.workspace || process.cwd()
+		if (!existsSync(resolvedWorkspace)) {
+			console.error(`Error: Workspace path does not exist: ${resolvedWorkspace}`)
+			process.exit(1)
+		}
+
+		const port = Number(options.port)
+		if (!Number.isFinite(port) || port <= 0) {
+			console.error("Error: --port must be a positive number")
+			process.exit(1)
+		}
+
+		try {
+			const { startWebServer } = await import("./web/server/index.js")
+			const serverOptions: StartWebServerOptions = {
+				port,
+				host: options.host,
+				workspace: resolvedWorkspace,
+			}
+			if (options.staticDir) {
+				serverOptions.staticDir = options.staticDir
+			}
+			webController = await startWebServer(serverOptions)
+			console.info(`Kilo Code web server running at http://${options.host}:${port}`)
+			console.info("Press Ctrl+C to stop the server.")
+		} catch (error) {
+			console.error("Failed to start web server", error)
+			process.exit(1)
+		}
+	})
+
+program
 	.command("auth")
 	.description("Manage authentication for the Kilo Code CLI")
 	.action(async () => {
@@ -252,20 +293,32 @@ program
 	})
 
 // Handle process termination signals
-process.on("SIGINT", async () => {
-	if (cli) {
-		await cli.dispose("SIGINT")
-	} else {
-		process.exit(130)
+async function handleSignal(signal: "SIGINT" | "SIGTERM", exitCode: number): Promise<void> {
+	if (webController) {
+		try {
+			await webController.close()
+		} catch (error) {
+			logs.error("Error shutting down web server", "Index", { error })
+		}
+		webController = null
+		process.exit(exitCode)
+		return
 	}
+
+	if (cli) {
+		await cli.dispose(signal)
+		return
+	}
+
+	process.exit(exitCode)
+}
+
+process.on("SIGINT", () => {
+	void handleSignal("SIGINT", 130)
 })
 
-process.on("SIGTERM", async () => {
-	if (cli) {
-		await cli.dispose("SIGTERM")
-	} else {
-		process.exit(143)
-	}
+process.on("SIGTERM", () => {
+	void handleSignal("SIGTERM", 143)
 })
 
 // Parse command line arguments

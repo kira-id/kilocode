@@ -50,6 +50,26 @@ kilocode -c
 kilocode --continue
 ```
 
+### Web App Mode (Experimental)
+
+Kilo Code now ships with a lightweight local web app so you can chat from the browser while the agent edits your workspace.
+
+1. Build the web assets (once per change):
+
+    ```bash
+    pnpm --filter @kilocode/cli web:build
+    ```
+
+2. Launch the server from your workspace:
+
+    ```bash
+    kilocode web --workspace /path/to/project --port 4173
+    ```
+
+3. Open `http://localhost:4173` in your browser. The UI streams the same conversation history as the CLI and supports approvals/cancellation.
+
+Use `Ctrl+C` in the terminal to stop the server. You can also provide `--host` or `--static-dir` to customize the binding or serve a custom build of the UI.
+
 ### Parallel mode
 
 Parallel mode allows multiple Kilo Code instances to work in parallel on the same directory, without conflicts. You can spawn as many Kilo Code instances as you need! Once finished, changes will be available on a separate git branch.
