@@ -181,6 +181,18 @@ Autonomous mode respects your auto-approval configuration. Edit your config file
 - `retry`: Auto-approve API retry requests
 - `todo`: Auto-approve todo list updates
 
+#### Web UI parity & config location
+
+- The web app uses the same `autoApproval` rules as the CLI; every key you set in your config is applied in both places.
+- Default config path: `~/.kilocode/cli/config.json`.
+- To override the location (for both read & write):
+
+```bash
+export KILO_CONFIG_FILE=/custom/path/config.json   # highest precedence
+# or
+export KILO_CONFIG_DIR=/custom/dir                 # uses config.json inside that dir
+```
+
 #### Command Approval Patterns
 
 The `execute.allowed` and `execute.denied` lists support hierarchical pattern matching:

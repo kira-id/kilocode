@@ -24,6 +24,8 @@ export interface ExtensionChatMessage {
 	checkpoint?: Record<string, unknown>
 }
 
+import type { AutoApprovalConfig } from "../../config/types.js"
+
 export interface ExtensionState {
 	chatMessages?: ExtensionChatMessage[]
 	cwd?: string
@@ -31,4 +33,5 @@ export interface ExtensionState {
 	currentApiConfigName?: string
 	customModes?: ModeConfig[]
 	availableModes?: ModeConfig[]
+	autoApproval?: AutoApprovalConfig | null
 }

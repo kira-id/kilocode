@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { KeyboardEvent } from "react"
-import { marked } from "marked"
+import { marked, Renderer } from "marked"
+import type { AutoApprovalConfig } from "../../config/types.js"
 import type { ExtensionChatMessage, ExtensionState, ModeConfig } from "./types"
 
-marked.setOptions({ gfm: true, breaks: true, headerIds: false, mangle: false })
+const renderer = new Renderer()
+renderer.heading = (text, level) => `<h${level}>${text}</h${level}>`
+marked.setOptions({ gfm: true, breaks: true, renderer })
 
 type ServerMessage =
 	| { type: "state"; state: ExtensionState | null }
@@ -186,6 +189,138 @@ function mergeModes(...lists: Array<ModeConfig[] | undefined>): ModeConfig[] {
 	}
 	const merged = Array.from(map.values())
 	return merged.length ? merged : [...FALLBACK_MODES]
+}
+
+type AutoApprovalDecision = { action: "auto-approve" | "auto-reject" | "manual"; delay?: number; message?: string }
+
+function matchesCommandPattern(command: string, patterns: string[]): boolean {
+	if (!patterns.length) return false
+	const normalizedCommand = command.trim()
+	return patterns.some((pattern) => {
+		const normalizedPattern = pattern.trim()
+		if (normalizedPattern === "*") return true
+		if (normalizedPattern === normalizedCommand) return true
+		if (normalizedCommand.startsWith(normalizedPattern)) {
+			const nextChar = normalizedCommand[normalizedPattern.length]
+			return nextChar === undefined || nextChar === " " || nextChar === "\t"
+		}
+		return false
+	})
+}
+
+function getToolDecision(message: ExtensionChatMessage, config: AutoApprovalConfig): AutoApprovalDecision {
+	const data = safeJsonParse<Record<string, unknown>>(message.text) || {}
+	const tool = data.tool as string | undefined
+
+	if (
+		tool === "readFile" ||
+		tool === "listFiles" ||
+		tool === "listFilesTopLevel" ||
+		tool === "listFilesRecursive" ||
+		tool === "searchFiles" ||
+		tool === "codebaseSearch" ||
+		tool === "listCodeDefinitionNames"
+	) {
+		const isOutside = data.isOutsideWorkspace === true
+		const allow = isOutside ? config.read?.outside : config.read?.enabled
+		return allow ? { action: "auto-approve" } : { action: "manual" }
+	}
+
+	if (
+		tool === "editedExistingFile" ||
+		tool === "appliedDiff" ||
+		tool === "newFileCreated" ||
+		tool === "insertContent" ||
+		tool === "searchAndReplace"
+	) {
+		const isOutside = data.isOutsideWorkspace === true
+		const isProtected = data.isProtected === true
+
+		const allow = isProtected
+			? config.write?.protected
+			: isOutside
+				? config.write?.outside
+				: config.write?.enabled
+
+		return allow ? { action: "auto-approve" } : { action: "manual" }
+	}
+
+	if (tool === "browser_action") {
+		return config.browser?.enabled ? { action: "auto-approve" } : { action: "manual" }
+	}
+
+	if (tool === "use_mcp_tool" || tool === "use_mcp_server" || tool === "access_mcp_resource") {
+		return config.mcp?.enabled ? { action: "auto-approve" } : { action: "manual" }
+	}
+
+	if (tool === "switchMode") {
+		return config.mode?.enabled ? { action: "auto-approve" } : { action: "manual" }
+	}
+
+	if (tool === "newTask") {
+		return config.subtasks?.enabled ? { action: "auto-approve" } : { action: "manual" }
+	}
+
+	if (tool === "updateTodoList") {
+		return config.todo?.enabled ? { action: "auto-approve" } : { action: "manual" }
+	}
+
+	return { action: "manual" }
+}
+
+function getCommandDecision(message: ExtensionChatMessage, config: AutoApprovalConfig): AutoApprovalDecision {
+	if (!config.execute?.enabled) return { action: "manual" }
+
+	let command = ""
+	const parsed = safeJsonParse<{ command?: string }>(message.text)
+	if (parsed?.command) {
+		command = parsed.command
+	} else if (typeof message.text === "string") {
+		command = message.text
+	}
+
+	const denied = config.execute?.denied ?? []
+	if (matchesCommandPattern(command, denied)) {
+		return { action: "manual" }
+	}
+
+	const allowed = config.execute?.allowed ?? []
+	if (allowed.length === 0) return { action: "manual" }
+
+	return matchesCommandPattern(command, allowed) ? { action: "auto-approve" } : { action: "manual" }
+}
+
+function getRetryDecision(config: AutoApprovalConfig): AutoApprovalDecision {
+	if (!config.retry?.enabled) return { action: "manual" }
+	const delayMs = Math.max(0, (config.retry.delay ?? 0) * 1000)
+	return { action: "auto-approve", ...(delayMs ? { delay: delayMs } : {}) }
+}
+
+function getFollowupDecision(config: AutoApprovalConfig): AutoApprovalDecision {
+	return config.question?.enabled ? { action: "auto-approve" } : { action: "manual" }
+}
+
+function getAutoApprovalDecision(
+	message: ExtensionChatMessage,
+	config?: AutoApprovalConfig | null,
+): AutoApprovalDecision {
+	if (!config?.enabled) return { action: "manual" }
+	if (message.type !== "ask" || message.partial || message.isAnswered) return { action: "manual" }
+
+	switch (message.ask) {
+		case "tool":
+			return getToolDecision(message, config)
+		case "command":
+			return getCommandDecision(message, config)
+		case "api_req_failed":
+			return getRetryDecision(config)
+		case "followup":
+			return getFollowupDecision(config)
+		case "use_mcp_server":
+			return config.mcp?.enabled ? { action: "auto-approve" } : { action: "manual" }
+		default:
+			return { action: "manual" }
+	}
 }
 
 function buildActionDetails(message: ExtensionChatMessage): ActionDetails {
@@ -477,8 +612,8 @@ const ModeSelector = ({
 	disabled,
 }: {
 	modes: ModeConfig[]
-	selected?: string
-	onSelect: (slug: string) => void
+	selected?: string | undefined
+	onSelect: (slug: string) => void | Promise<void>
 	disabled?: boolean
 }) => {
 	const current = modes.find((mode) => mode.slug === selected) || modes[0]
@@ -512,6 +647,7 @@ const CheckpointPanel = ({ checkpoints }: { checkpoints: ExtensionChatMessage[] 
 		const deduped: ExtensionChatMessage[] = []
 		for (let i = checkpoints.length - 1; i >= 0; i -= 1) {
 			const cp = checkpoints[i]
+			if (!cp) continue
 			const hash = cp.text || `cp-${cp.ts}`
 			if (!hash || seen.has(hash)) continue
 			seen.add(hash)
@@ -573,7 +709,8 @@ const ActionRequestCard = ({
 		setSubmitting(null)
 	}, [message.ts, message.ask])
 
-	const buttonCopy = ACTION_BUTTON_COPY[message.ask || ""] || ACTION_BUTTON_COPY.default
+	const buttonCopy: { approve: string; reject: string } =
+		(ACTION_BUTTON_COPY[message.ask || ""] ?? ACTION_BUTTON_COPY.default)!
 
 	const handleRespond = async (response: "yes" | "no") => {
 		setSubmitting(response)
@@ -639,7 +776,7 @@ const ActionRequestCard = ({
 				</div>
 			)}
 
-			{details.raw && (
+			{details.raw !== undefined && details.raw !== null && (
 				<details className="structured-block">
 					<summary>Raw payload</summary>
 					<pre>{JSON.stringify(details.raw, null, 2)}</pre>
@@ -681,8 +818,15 @@ export default function App() {
 	const [input, setInput] = useState("")
 	const [pending, setPending] = useState(false)
 	const [modePending, setModePending] = useState(false)
+	const [autoApprovalStatus, setAutoApprovalStatus] = useState<{
+		ts: number
+		action: "approve" | "reject"
+		status: "pending" | "sent" | "error"
+		message?: string
+	} | null>(null)
 	const reconnectTimer = useRef<number | null>(null)
 	const inputRef = useRef<HTMLTextAreaElement | null>(null)
+	const autoHandledRef = useRef<Set<number>>(new Set())
 
 	const fetchInitialState = useCallback(async () => {
 		try {
@@ -764,6 +908,7 @@ export default function App() {
 	}, [])
 
 	const chatMessages = state?.chatMessages ?? []
+	const autoApprovalConfig = state?.autoApproval ?? null
 	const pendingAsk = useMemo(() => {
 		for (let i = chatMessages.length - 1; i >= 0; i -= 1) {
 			const msg = chatMessages[i]
@@ -773,6 +918,11 @@ export default function App() {
 		}
 		return null
 	}, [chatMessages])
+
+	const pendingAskTs = pendingAsk?.ts ?? -1
+	const autoStatusForPending =
+		autoApprovalStatus && pendingAskTs !== -1 && autoApprovalStatus.ts === pendingAskTs
+	const hideActionCard = autoStatusForPending && autoApprovalStatus.status !== "error"
 
 	const checkpoints = useMemo(
 		() => chatMessages.filter((msg) => msg.say === "checkpoint_saved" && msg.text),
@@ -853,6 +1003,71 @@ export default function App() {
 		}
 	}, [])
 
+	useEffect(() => {
+		if (!pendingAsk || pendingAsk.partial) {
+			setAutoApprovalStatus(null)
+			return
+		}
+
+		const ts = pendingAsk.ts ?? -1
+		if (!autoApprovalConfig?.enabled || ts === -1) {
+			setAutoApprovalStatus(null)
+			return
+		}
+
+		// Avoid re-processing the same message
+		if (autoHandledRef.current.has(ts)) {
+			return
+		}
+
+		const decision = getAutoApprovalDecision(pendingAsk, autoApprovalConfig)
+		if (decision.action === "manual") {
+			setAutoApprovalStatus(null)
+			return
+		}
+
+		autoHandledRef.current.add(ts)
+		const action = decision.action === "auto-approve" ? "approve" : "reject"
+		setAutoApprovalStatus({
+			ts,
+			action,
+			status: "pending",
+			...(decision.message ? { message: decision.message } : {}),
+		})
+
+		const respond = async () => {
+			try {
+				await respondToAsk(action === "approve" ? "yes" : "no", decision.message)
+				setAutoApprovalStatus((prev) => (prev && prev.ts === ts ? { ...prev, status: "sent" } : prev))
+			} catch (err) {
+				autoHandledRef.current.delete(ts)
+				const message = err instanceof Error ? err.message : "Failed to auto-respond"
+				setError(message)
+				setAutoApprovalStatus({
+					ts,
+					action,
+					status: "error",
+					message,
+				})
+			}
+		}
+
+		let timer: number | null = null
+		if (decision.delay && decision.delay > 0) {
+			timer = window.setTimeout(() => {
+				void respond()
+			}, decision.delay)
+		} else {
+			void respond()
+		}
+
+		return () => {
+			if (timer) {
+				window.clearTimeout(timer)
+			}
+		}
+	}, [pendingAsk, autoApprovalConfig, respondToAsk, setError])
+
 	const cancelTask = useCallback(async () => {
 		try {
 			await fetch("/api/cancel", { method: "POST" })
@@ -911,6 +1126,18 @@ export default function App() {
 
 			{error && <div className="error-banner">{error}</div>}
 			{lastStatus && !error && <div className="status-pill secondary">{lastStatus}</div>}
+			{autoStatusForPending && autoApprovalStatus.status === "pending" && (
+				<div className="status-pill secondary">
+					{autoApprovalStatus.action === "approve" ? "Auto-approving" : "Auto-rejecting"}{" "}
+					{pendingAsk?.ask ? formatLabel(pendingAsk.ask) : "request"} based on your settings…
+				</div>
+			)}
+			{autoStatusForPending && autoApprovalStatus.status === "sent" && (
+				<div className="status-pill secondary">
+					{pendingAsk?.ask ? formatLabel(pendingAsk.ask) : "Request"} automatically{" "}
+					{autoApprovalStatus.action === "approve" ? "approved" : "rejected"}
+				</div>
+			)}
 
 			<div className="layout-grid">
 				<div className="primary-column">
@@ -938,7 +1165,7 @@ export default function App() {
 				</div>
 
 				<div className="secondary-column">
-					{pendingAsk && (
+					{pendingAsk && !hideActionCard && (
 						<ActionRequestCard
 							message={pendingAsk}
 							onRespond={respondToAsk}

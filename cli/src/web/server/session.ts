@@ -121,6 +121,8 @@ export class WebChatSession extends EventEmitter {
 			...this.state,
 			customModes: serializedCustomModes,
 			availableModes: this.getAvailableModes(),
+			// Expose auto-approval config to the web client so it can mirror CLI behaviour
+			autoApproval: this.config?.autoApproval,
 		}
 	}
 

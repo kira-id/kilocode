@@ -22,6 +22,25 @@ export const CONFIG_FILE = path.join(CONFIG_DIR, "config.json")
 let configDir = CONFIG_DIR
 let configFile = CONFIG_FILE
 
+function applyEnvPathOverrides(): void {
+	const envConfigDir = process.env.KILO_CONFIG_DIR
+	const envConfigFile = process.env.KILO_CONFIG_FILE
+
+	if (envConfigFile) {
+		const resolved = path.resolve(envConfigFile)
+		configFile = resolved
+		configDir = path.dirname(resolved)
+	} else if (envConfigDir) {
+		configDir = path.resolve(envConfigDir)
+		configFile = path.join(configDir, "config.json")
+	} else {
+		configDir = CONFIG_DIR
+		configFile = CONFIG_FILE
+	}
+}
+
+applyEnvPathOverrides()
+
 export function setConfigPaths(dir: string, file: string): void {
 	configDir = dir
 	configFile = file
@@ -30,6 +49,7 @@ export function setConfigPaths(dir: string, file: string): void {
 export function resetConfigPaths(): void {
 	configDir = CONFIG_DIR
 	configFile = CONFIG_FILE
+	applyEnvPathOverrides()
 }
 
 export async function ensureConfigDir(): Promise<void> {
