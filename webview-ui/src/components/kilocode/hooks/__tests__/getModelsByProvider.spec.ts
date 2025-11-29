@@ -31,6 +31,7 @@ describe("getModelsByProvider", () => {
 			gemini: { "test-model": testModel },
 			ovhcloud: { "test-model": testModel },
 			chutes: { "test-model": testModel },
+			"sap-ai-core": { "test-model": testModel }, // kilocode_change
 			synthetic: { "test-model": testModel }, // kilocode_change
 			inception: { "test-model": testModel },
 			roo: { "test-model": testModel },

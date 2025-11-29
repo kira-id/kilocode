@@ -28,6 +28,7 @@ import { getOvhCloudAiEndpointsModels } from "./ovhcloud"
 import { getGeminiModels } from "./gemini"
 import { getInceptionModels } from "./inception"
 import { getSyntheticModels } from "./synthetic"
+import { getSapAiCoreModels } from "./sap-ai-core"
 // kilocode_change end
 
 import { getDeepInfraModels } from "./deepinfra"
@@ -138,6 +139,13 @@ export const getModels = async (options: GetModelsOptions): Promise<ModelRecord>
 				models = await getHuggingFaceModels()
 				break
 			// kilocode_change start
+			case "sap-ai-core":
+				models = await getSapAiCoreModels(
+					options.sapAiCoreServiceKey,
+					options.sapAiCoreResourceGroup,
+					options.sapAiCoreUseOrchestration,
+				)
+				break
 			case "inception":
 				models = await getInceptionModels()
 				break

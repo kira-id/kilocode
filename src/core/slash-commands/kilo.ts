@@ -36,25 +36,17 @@ export async function parseKiloSlashCommands(
 	}
 
 	// this currently allows matching prepended whitespace prior to /slash-command
-	const tagPattern = /<(task|feedback|answer|user_message)>(\s*\/([a-zA-Z0-9_.-]+))(\s+.+?)?\s*<\/\1>/is
+	const tagPattern = /<(task|feedback|answer|user_message)>(\s*\/([a-zA-Z0-9_.-]+))(\s+.+?)?\s*<\/\1>/dis
 
 	const match = tagPattern.exec(text)
 
-	if (match) {
-		const [fullMatch, _tagName, commandWithWhitespace, commandName] = match
-		const fullMatchStartIndex = match.index
+	if (match?.indices) {
+		// remove the slash command
+		const commandName = match[3]
+		const [slashCommandStartIndex, slashCommandEndIndex] = match.indices[2]
+		const textWithoutSlashCommand = text.slice(0, slashCommandStartIndex) + text.slice(slashCommandEndIndex)
+
 		const command = commandReplacements[commandName]
-
-		// find position of slash command within the full match
-		const relativeStartIndex = fullMatch.indexOf(commandWithWhitespace)
-
-		// calculate absolute indices in the original string
-		const slashCommandStartIndex = fullMatchStartIndex + relativeStartIndex
-		const slashCommandEndIndex = slashCommandStartIndex + commandWithWhitespace.length
-
-		// remove the slash command and add custom instructions at the top of this message
-		const textWithoutSlashCommand = text.substring(0, slashCommandStartIndex) + text.substring(slashCommandEndIndex)
-
 		if (command) {
 			const processedText = command(textWithoutSlashCommand)
 			return { processedText, needsRulesFileCheck: commandName === "newrule" }

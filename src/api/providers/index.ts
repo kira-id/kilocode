@@ -34,6 +34,7 @@ export { VirtualQuotaFallbackHandler } from "./virtual-quota-fallback"
 export { SyntheticHandler } from "./synthetic"
 export { InceptionLabsHandler } from "./inception"
 export { MiniMaxAnthropicHandler } from "./minimax-anthropic"
+export { SapAiCoreHandler } from "./sap-ai-core"
 // kilocode_change end
 export { VsCodeLmHandler } from "./vscode-lm"
 export { XAIHandler } from "./xai"

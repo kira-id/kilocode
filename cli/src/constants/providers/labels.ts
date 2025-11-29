@@ -48,6 +48,7 @@ export const PROVIDER_LABELS: Record<ProviderName, string> = {
 	ovhcloud: "OVHcloud AI Endpoints",
 	inception: "Inception",
 	synthetic: "Synthetic",
+	"sap-ai-core": "SAP AI Core",
 }
 
 /**

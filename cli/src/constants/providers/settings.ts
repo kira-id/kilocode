@@ -634,6 +634,32 @@ export const FIELD_REGISTRY: Record<string, FieldMetadata> = {
 		placeholder: "Enter Synthetic API key...",
 	},
 
+	// SAP AI Core fields
+	sapAiCoreServiceKey: {
+		label: "Service Key",
+		type: "password",
+		placeholder: "Enter SAP AI Core service key...",
+	},
+	sapAiCoreResourceGroup: {
+		label: "Resource Group",
+		type: "text",
+		placeholder: "Enter resource group...",
+	},
+	sapAiCoreUseOrchestration: {
+		label: "Use Orchestration",
+		type: "boolean",
+	},
+	sapAiCoreModelId: {
+		label: "Model ID",
+		type: "text",
+		placeholder: "Enter model ID...",
+	},
+	sapAiCoreDeploymentId: {
+		label: "Deployment ID",
+		type: "text",
+		placeholder: "Enter deployment ID...",
+	},
+
 	// Virtual Quota Fallback fields
 	profiles: {
 		label: "Profiles Configuration",
@@ -1008,6 +1034,14 @@ export const getProviderSettings = (provider: ProviderName, config: ProviderSett
 				createFieldConfig("apiModelId", config, "synthetic-model"),
 			]
 
+		case "sap-ai-core":
+			return [
+				createFieldConfig("sapAiCoreServiceKey", config),
+				createFieldConfig("sapAiCoreResourceGroup", config),
+				createFieldConfig("sapAiCoreDeploymentId", config),
+				createFieldConfig("sapAiCoreModelId", config),
+			]
+
 		default:
 			return []
 	}
@@ -1060,6 +1094,7 @@ export const PROVIDER_DEFAULT_MODELS: Record<ProviderName, string> = {
 	ovhcloud: "gpt-oss-120b",
 	inception: "gpt-4o",
 	synthetic: "synthetic-model",
+	"sap-ai-core": "gpt-4o",
 }
 
 /**

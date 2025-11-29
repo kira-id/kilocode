@@ -251,6 +251,12 @@ export const getModelsByProvider = ({
 				defaultModel: inceptionDefaultModelId,
 			}
 		}
+		case "sap-ai-core": {
+			return {
+				models: routerModels["sap-ai-core"],
+				defaultModel: "",
+			}
+		}
 		// kilocode_change end
 		case "io-intelligence": {
 			return {

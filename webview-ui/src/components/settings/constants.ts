@@ -67,6 +67,7 @@ export const PROVIDERS = [
 	{ value: "virtual-quota-fallback", label: "Virtual Quota Fallback" },
 	{ value: "synthetic", label: "Synthetic" },
 	{ value: "ovhcloud", label: "OVHcloud AI Endpoints" },
+	{ value: "sap-ai-core", label: "SAP AI Core" },
 	// kilocode_change end
 	{ value: "deepseek", label: "DeepSeek" },
 	{ value: "moonshot", label: "Moonshot" },

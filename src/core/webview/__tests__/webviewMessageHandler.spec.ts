@@ -289,6 +289,7 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 				"io-intelligence": {},
 				ovhcloud: mockModels, // kilocode_change
 				inception: mockModels, // kilocode_change
+				"sap-ai-core": {}, // kilocode_change
 			},
 			values: undefined,
 		})
@@ -395,6 +396,7 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 				"io-intelligence": {},
 				ovhcloud: mockModels, // kilocode_change
 				inception: mockModels, // kilocode_change
+				"sap-ai-core": {}, // kilocode_change
 			},
 			values: undefined,
 		})
@@ -502,6 +504,7 @@ describe("webviewMessageHandler - requestRouterModels", () => {
 				synthetic: {},
 				gemini: mockModels,
 				ovhcloud: mockModels,
+				"sap-ai-core": {},
 				// kilocode_change end
 			},
 			values: undefined,
@@ -861,8 +864,8 @@ describe("webviewMessageHandler - mcpEnabled", () => {
 
 	it("delegates enable=true to McpHub and posts updated state", async () => {
 		await webviewMessageHandler(mockClineProvider, {
-			type: "mcpEnabled",
-			bool: true,
+			type: "updateSettings",
+			updatedSettings: { mcpEnabled: true },
 		})
 
 		expect((mockClineProvider as any).getMcpHub).toHaveBeenCalledTimes(1)
@@ -873,8 +876,8 @@ describe("webviewMessageHandler - mcpEnabled", () => {
 
 	it("delegates enable=false to McpHub and posts updated state", async () => {
 		await webviewMessageHandler(mockClineProvider, {
-			type: "mcpEnabled",
-			bool: false,
+			type: "updateSettings",
+			updatedSettings: { mcpEnabled: false },
 		})
 
 		expect((mockClineProvider as any).getMcpHub).toHaveBeenCalledTimes(1)
@@ -887,8 +890,8 @@ describe("webviewMessageHandler - mcpEnabled", () => {
 		;(mockClineProvider as any).getMcpHub = vi.fn().mockReturnValue(undefined)
 
 		await webviewMessageHandler(mockClineProvider, {
-			type: "mcpEnabled",
-			bool: true,
+			type: "updateSettings",
+			updatedSettings: { mcpEnabled: true },
 		})
 
 		expect((mockClineProvider as any).getMcpHub).toHaveBeenCalledTimes(1)

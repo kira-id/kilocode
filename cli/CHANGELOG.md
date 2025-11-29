@@ -1,5 +1,11 @@
 # @kilocode/cli
 
+## 0.10.0
+
+### Minor Changes
+
+- [#3868](https://github.com/Kilo-Org/kilocode/pull/3868) [`cf6ed3e`](https://github.com/Kilo-Org/kilocode/commit/cf6ed3ed3bc7dfe0268121f3e68d422f3ffadfff) Thanks [@iscekic](https://github.com/iscekic)! - add sessions support
+
 ## 0.9.0
 
 ### Minor Changes

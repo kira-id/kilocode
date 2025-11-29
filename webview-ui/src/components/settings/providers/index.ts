@@ -32,6 +32,7 @@ export { GeminiCli } from "./GeminiCli"
 export { VirtualQuotaFallbackProvider } from "./VirtualQuotaFallbackProvider"
 export { Inception } from "./Inception"
 export { Synthetic } from "./Synthetic"
+export { default as SapAiCore } from "./SapAiCore"
 // kilocode_change end
 export { ZAi } from "./ZAi"
 export { LiteLLM } from "./LiteLLM"
